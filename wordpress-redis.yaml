@@ -1,0 +1,424 @@
+# yaml-language-server: $schema=https://schema.zeabur.app/template.json
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+    name: WordPress with Redis
+spec:
+    description: A high-performance WordPress setup with Redis caching, allowing you to host and build scalable websites with improved performance.
+    coverImage: https://www.cloudways.com/blog/wp-content/uploads/Redis-Cache-on-WordPress.jpg
+    icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/wordpress.png
+    variables:
+        - key: WORDPRESS_DOMAIN
+          type: DOMAIN
+          name: Domain
+          description: What is the domain of your WordPress website?
+    tags:
+        - CMS
+        - Website
+        - Blog
+        - Starter
+    readme: |-
+        # Welcome to WordPress with Redis
+
+        WordPress is an open-source content management system (CMS) that enables you to create a website or blog from scratch or to improve an existing website. This template includes Redis caching out of the box, providing significantly improved performance and scalability compared to standard WordPress setups.
+
+        ## Enhanced Performance with Redis
+        
+        Redis integration provides:
+        - Faster page load times through efficient caching
+        - Reduced database load
+        - Better handling of high traffic
+        - Improved overall site performance
+        
+        ## Important: Activate Redis Cache
+
+        To enable Redis caching after completing your WordPress installation:
+        1. Go to the WordPress admin panel
+        2. Navigate to "Plugins"
+        3. Find and activate the "Redis Object Cache" plugin
+        4. Go to Settings > Redis to verify the connection status
+
+        ## Key Features
+
+        - **User-friendly**: WordPress is designed with non-technical users in mind, making it easy for anyone to publish content.
+        - **Customizable**: With thousands of themes and plugins, you can tailor your site to fit your needs and style.
+        - **SEO Friendly**: WordPress is optimized for search engines right out of the box.
+        - **Responsive Design**: Your WordPress website will look great on any device, whether it's a computer, tablet, or smartphone.
+
+        Whether you're a blogger, small business owner, or web developer, WordPress has the tools and resources to help you create a professional online presence. Join the millions of users who trust WordPress for their website and blogging needs.
+
+        ## Troubleshooting
+
+        If you encounter any issues, please refer to the [https://github.com/lcandy2/zeabur-wordpress-redis](https://github.com/lcandy2/zeabur-wordpress-redis) to report the issue.
+
+
+    services:
+        - name: mariadb
+          icon: https://cdn.zeabur.com/mariadb.svg
+          template: PREBUILT
+          spec:
+            source:
+                image: mariadb:11
+            ports:
+                - id: database
+                  port: 3306
+                  type: TCP
+            volumes:
+                - id: data
+                  dir: /var/lib/mysql
+            instructions:
+                - type: TEXT
+                  title: Command to connect to your MariaDB
+                  content: mariadb --host ${PORT_FORWARDED_HOSTNAME} --port=${DATABASE_PORT_FORWARDED_PORT} --user=${MARIADB_USERNAME} --password=${MARIADB_PASSWORD} --database=${MARIADB_DATABASE}
+                - type: TEXT
+                  title: MariaDB username
+                  content: ${MARIADB_USERNAME}
+                  category: Credentials
+                - type: PASSWORD
+                  title: MariaDB password
+                  content: ${MARIADB_PASSWORD}
+                  category: Credentials
+                - type: TEXT
+                  title: MariaDB database
+                  content: ${MARIADB_DATABASE}
+                  category: Credentials
+                - type: TEXT
+                  title: MariaDB host
+                  content: ${PORT_FORWARDED_HOSTNAME}
+                  category: Hostname & Port
+                - type: TEXT
+                  title: MariaDB port
+                  content: ${DATABASE_PORT_FORWARDED_PORT}
+                  category: Hostname & Port
+            env:
+                MARIADB_DATABASE:
+                    default: zeabur
+                    expose: true
+                ## Use build-in internal hostname, no need to redeclare
+                # MARIADB_HOST:
+                #     # default: ${CONTAINER_HOSTNAME} Use internal hostname instead
+                #     # default: mariadb.zeabur.internal Use variable internal hostname instead
+                #     default: ${MARIADB_HOST}
+                #     expose: true
+                #     readonly: true
+                MARIADB_PASSWORD:
+                    default: ${PASSWORD}
+                    expose: true
+                ## Use build-in internal port, no need to redeclare
+                # MARIADB_PORT:
+                #     # default: ${DATABASE_PORT} Use internal port instead
+                #     default: ${MARIADB_PORT}
+                #     expose: true
+                #     readonly: true
+                MARIADB_ROOT_PASSWORD:
+                    default: ${PASSWORD}
+                MARIADB_USERNAME:
+                    default: root
+                    expose: true
+                    readonly: true
+            configs:
+                - path: /etc/mysql/conf.d/99-custom.cnf
+                  template: |
+                    ; see https://mariadb.com/kb/en/server-system-variables/#setting-server-system-variables for configuration
+                  permission: null
+                  envsubst: null
+        - name: redis
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/redis.svg
+          template: PREBUILT
+          spec:
+            source:
+                image: redis:alpine
+                command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+            ports:
+                - id: database
+                  port: 6379
+                  type: TCP
+            volumes:
+                - id: data
+                  dir: /data
+                - id: config
+                  dir: /usr/local/etc/redis
+            instructions:
+                - type: TEXT
+                  title: Command to connect to your Redis
+                  content: redis-cli -h ${PORT_FORWARDED_HOSTNAME} -p ${DATABASE_PORT_FORWARDED_PORT} -a ${REDIS_PASSWORD}
+                - type: TEXT
+                  title: Redis Connection String
+                  content: redis://:${REDIS_PASSWORD}@${PORT_FORWARDED_HOSTNAME}:${DATABASE_PORT_FORWARDED_PORT}
+                - type: PASSWORD
+                  title: Redis password
+                  content: ${REDIS_PASSWORD}
+                  category: Credentials
+                - type: TEXT
+                  title: Redis host
+                  content: ${PORT_FORWARDED_HOSTNAME}
+                  category: Hostname & Port
+                - type: TEXT
+                  title: Redis port
+                  content: ${DATABASE_PORT_FORWARDED_PORT}
+                  category: Hostname & Port
+            env:
+                CONFFILE:
+                    default: /usr/local/etc/redis/redis.conf
+                REDIS_ARGS:
+                    default: /usr/local/etc/redis/redis.conf
+                REDIS_CONNECTION_STRING:
+                    default: redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}
+                    expose: true
+                    readonly: true
+                ## No build-in internal hostname, need to redeclare, changing when internal hostname changes
+                REDIS_HOST:
+                    # default: ${CONTAINER_HOSTNAME} Use internal hostname instead
+                    default: redis.zeabur.internal
+                    # default: ${REDIS_HOST}
+                    expose: true
+                    readonly: true
+                REDIS_PASSWORD:
+                    default: ${PASSWORD}
+                    expose: true
+                ## No build-in internal port, need to redeclare, changing when internal port changes
+                REDIS_PORT:
+                    # default: ${DATABASE_PORT} Use internal port instead
+                    default: '6379' # Need string instead of number
+                    expose: true
+                    readonly: true
+                REDIS_URI:
+                    default: ${REDIS_CONNECTION_STRING}
+                    expose: true
+                    readonly: true
+            configs:
+                - path: /usr/local/etc/redis/redis.conf
+                  template: |
+                    port 6379
+                    daemonize no
+                    requirepass ${REDIS_PASSWORD}
+                    maxmemory 256mb
+                    maxmemory-policy allkeys-lru
+                  permission: null
+                  envsubst: true
+        - name: wordpress
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/wordpress.png
+          template: PREBUILT_V2
+          spec:
+            source:
+                image: wordpress:6-php8.3
+                command:
+                    - /bin/bash
+                args:
+                    - -c
+                    - |
+                      apt-get update && \
+                      apt-get install -y libzstd-dev unzip && \
+                      pecl install redis && \
+                      docker-php-ext-enable redis && \
+                      mkdir -p /usr/src/wordpress/wp-content/plugins/redis-cache && \
+                      curl -L https://downloads.wordpress.org/plugin/redis-cache.latest-stable.zip -o /tmp/redis-cache.zip && \
+                      unzip /tmp/redis-cache.zip -d /usr/src/wordpress/wp-content/plugins/ && \
+                      rm /tmp/redis-cache.zip && \
+                      docker-entrypoint.sh apache2-foreground
+            ports:
+                - id: web
+                  port: 80
+                  type: HTTP
+            volumes:
+                - id: data
+                  dir: /var/www/html
+            env:
+                WORDPRESS_DB_HOST:
+                    default: ${MARIADB_HOST}:${MARIADB_PORT}
+                    expose: false
+                WORDPRESS_DB_NAME:
+                    default: ${MARIADB_DATABASE}
+                    expose: false
+                WORDPRESS_DB_PASSWORD:
+                    default: ${MARIADB_PASSWORD}
+                    expose: false
+                WORDPRESS_DB_USER:
+                    default: ${MARIADB_USERNAME}
+                    expose: false
+                WORDPRESS_DEBUG:
+                    default: "0"
+                    expose: false
+                WORDPRESS_REDIS_HOST:
+                    default: ${REDIS_HOST}
+                    expose: false
+                WORDPRESS_REDIS_PORT:
+                    default: ${REDIS_PORT}
+                    expose: false
+                WORDPRESS_REDIS_PASSWORD:
+                    default: ${REDIS_PASSWORD}
+                    expose: false
+            configs:
+                - path: /var/www/html/wp-config.php
+                  template: "<?php\n\nif (!function_exists('getenv_docker')) {\n\tfunction getenv_docker($env, $default) {\n\t\tif ($fileEnv = getenv($env . '_FILE')) {\n\t\t\treturn rtrim(file_get_contents($fileEnv), \"\r\n\");\n\t\t}\n\t\telse if (($val = getenv($env)) !== false) {\n\t\t\treturn $val;\n\t\t}\n\t\telse {\n\t\t\treturn $default;\n\t\t}\n\t}\n}\n\ndefine( 'DB_NAME', getenv_docker('WORDPRESS_DB_NAME', 'wordpress') );\ndefine( 'DB_USER', getenv_docker('WORDPRESS_DB_USER', 'example username') );\ndefine( 'DB_PASSWORD', getenv_docker('WORDPRESS_DB_PASSWORD', 'example password') );\n\ndefine( 'DB_HOST', getenv_docker('WORDPRESS_DB_HOST', 'mysql') );\ndefine( 'DB_CHARSET', getenv_docker('WORDPRESS_DB_CHARSET', 'utf8') );\ndefine( 'DB_COLLATE', getenv_docker('WORDPRESS_DB_COLLATE', '') );\n\ndefine( 'WP_REDIS_HOST', getenv_docker('WORDPRESS_REDIS_HOST', 'redis') );\ndefine( 'WP_REDIS_PORT', getenv_docker('WORDPRESS_REDIS_PORT', '6379') );\ndefine( 'WP_REDIS_PASSWORD', getenv_docker('WORDPRESS_REDIS_PASSWORD', '') );\ndefine( 'WP_REDIS_SCHEME', 'tcp' );\ndefine( 'WP_REDIS_DATABASE', 0 );\ndefine( 'WP_CACHE', true );\ndefine( 'WP_CACHE_KEY_SALT', DB_NAME );\n\ndefine( 'AUTH_KEY',         getenv_docker('WORDPRESS_AUTH_KEY',         'b5703d7e2fff54eb27af2d5d71718418a4285d93') );\ndefine( 'SECURE_AUTH_KEY',  getenv_docker('WORDPRESS_SECURE_AUTH_KEY',  '266068c6a79054edb1549ef4e8d7ac9161d8ae22') );\ndefine( 'LOGGED_IN_KEY',    getenv_docker('WORDPRESS_LOGGED_IN_KEY',    '8d48501345a93e588fb364374d9c4e3d37ab42c6') );\ndefine( 'NONCE_KEY',        getenv_docker('WORDPRESS_NONCE_KEY',        'fa4dae194949d8530fdd337384a6dc91f1154b84') );\ndefine( 'AUTH_SALT',        getenv_docker('WORDPRESS_AUTH_SALT',        '10b42a9840a7fb7ff3d8a57275cef17451f85038') );\ndefine( 'SECURE_AUTH_SALT', getenv_docker('WORDPRESS_SECURE_AUTH_SALT', '45c7e22c7c005a39f32f9a338ae03af86f14c967') );\ndefine( 'LOGGED_IN_SALT',   getenv_docker('WORDPRESS_LOGGED_IN_SALT',   'ceda7f55fc77c0d7b8429a34f918ba7636594eb4') );\ndefine( 'NONCE_SALT',       getenv_docker('WORDPRESS_NONCE_SALT',       'e64aa6eb6b68c950b32f2e89e76581dbf6e6edd7') );\n\n$table_prefix = getenv_docker('WORDPRESS_TABLE_PREFIX', 'wp_');\n\ndefine( 'WP_DEBUG', !!getenv_docker('WORDPRESS_DEBUG', '') );\n\nif (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos($_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {\n\t$_SERVER['HTTPS'] = 'on';\n}\n\ndefine('FS_METHOD', 'direct');\n\nif ( ! defined( 'ABSPATH' ) ) {\n\tdefine( 'ABSPATH', __DIR__ . '/' );\n}\n\nrequire_once ABSPATH . 'wp-settings.php';\n"
+                - path: /var/www/html/.htaccess
+                  template: |
+                    # BEGIN WordPress
+                    # The directives (lines) between "BEGIN WordPress" and "END WordPress" are
+                    # dynamically generated, and should only be modified via WordPress filters.
+                    # Any changes to the directives between these markers will be overwritten.
+                    <IfModule mod_rewrite.c>
+                    RewriteEngine On
+                    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+                    RewriteBase /
+                    RewriteRule ^index.php$ - [L]
+                    RewriteCond %{REQUEST_FILENAME} !-f
+                    RewriteCond %{REQUEST_FILENAME} !-d
+                    RewriteRule . /index.php [L]
+                    </IfModule>
+                    # END WordPress
+                    php_value upload_max_filesize 20480M
+                    php_value post_max_size 20480M
+                    php_value max_execution_time 3000
+                    php_value max_input_time 3000
+                    LimitRequestBody 34359738368
+                - path: /usr/local/etc/php/conf.d/uploads.ini
+                  template: |
+                    file_uploads = On
+                    upload_max_filesize = 20480M
+                    post_max_size = 20480M
+                    memory_limit = 20480M
+                    max_execution_time = 3000
+                - path: /etc/apache2/conf-available/wordpress.conf
+                  template: LimitRequestBody 34359738368
+localization:
+    es-ES:
+        description: Un sistema de gestión de contenido (CMS) con caché Redis integrado que le permite alojar y construir sitios web de alto rendimiento.
+        readme: |
+            # Bienvenido a WordPress con Redis
+
+            WordPress es un sistema de gestión de contenido (CMS) de código abierto que le permite crear un sitio web o blog desde cero o mejorar un sitio web existente. Esta plantilla incluye caché Redis integrado, proporcionando un rendimiento y escalabilidad significativamente mejorados en comparación con las instalaciones estándar de WordPress.
+
+            ## Rendimiento Mejorado con Redis
+            
+            La integración de Redis proporciona:
+            - Tiempos de carga de página más rápidos a través del almacenamiento en caché eficiente
+            - Reducción de la carga de la base de datos
+            - Mejor manejo del tráfico alto
+            - Mejor rendimiento general del sitio
+            
+            ## Importante: Activar Redis Cache
+
+            Para habilitar el caché de Redis después de completar la instalación de WordPress:
+            1. Ve al panel de administración de WordPress
+            2. Navega hasta "Plugins"
+            3. Busca y activa el plugin "Redis Object Cache"
+            4. Ve a Ajustes > Redis para verificar el estado de la conexión
+            
+            ## Características Clave
+
+            - **Fácil de usar**: WordPress está diseñado pensando en usuarios no técnicos, lo que facilita que cualquiera pueda publicar contenido.
+            - **Personalizable**: Con miles de temas y plugins, puede adaptar su sitio para satisfacer sus necesidades y estilo.
+            - **Amigable con SEO**: WordPress está optimizado para motores de búsqueda desde el primer momento.
+            - **Diseño Responsivo**: Su sitio web de WordPress se verá genial en cualquier dispositivo, ya sea una computadora, tableta o teléfono inteligente.
+
+            Ya sea que sea un bloguero, propietario de una pequeña empresa o desarrollador web, WordPress tiene las herramientas y recursos para ayudarle a crear una presencia en línea profesional. Únase a los millones de usuarios que confían en WordPress para sus necesidades de sitios web y blogs。
+
+            ## Solución de Problemas
+
+            Si encuentra algún problema, consulte [https://github.com/lcandy2/zeabur-wordpress-redis](https://github.com/lcandy2/zeabur-wordpress-redis) para informar del problema.
+    ja-JP:
+        description: Redisキャッシュを統合した高性能なWordPress環境で、スケーラブルなウェブサイトをホストし、構築することができるコンテンツ管理システム（CMS）。
+        readme: |
+            # Redisを統合したWordPressへようこそ
+
+            WordPressは、ゼロからウェブサイトやブログを作成したり、既存のウェブサイトを改善したりすることができるオープンソースのコンテンツ管理システム（CMS）です。このテンプレートには、標準のWordPress環境と比較して、大幅に向上したパフォーマンスとスケーラビリティを提供するRedisキャッシュが組み込まれています。
+
+            ## Redisによる性能向上
+            
+            Redis統合により以下が実現します：
+            - 効率的なキャッシュによる高速なページ読み込み
+            - データベース負荷の軽減
+            - 高トラフィックの効果的な処理
+            - サイト全体のパフォーマンス向上
+            
+            ## 重要：Redisキャッシュの有効化
+
+            WordPressのインストール完了後、Redisキャッシュを有効にするには：
+            1. WordPress管理パネルにアクセス
+            2. 「プラグイン」に移動
+            3. 「Redis Object Cache」プラグインを見つけて有効化
+            4. 設定 > Redisで接続状態を確認
+            
+            ## 主な特徴
+
+            - **ユーザーフレンドリー**：WordPressは非技術的なユーザーを念頭に置いて設計されており、誰でも簡単にコンテンツを公開できます。
+            - **カスタマイズ可能**：数千のテーマとプラグインを使って、あなたのニーズとスタイルに合わせてサイトをカスタマイズできます。
+            - **SEOフレンドリー**：WordPressは初期設定のままで検索エンジンに最適化されています。
+            - **レスポンシブデザイン**：コンピュータ、タブレット、スマートフォンのいずれでも、WordPressサイトは素晴らしい見た目になります。
+
+            ブロガー、小規模ビジネスオーナー、ウェブ開発者のいずれであっても、WordPressにはプロフェッショナルなオンラインプレゼンスを作成するためのツールとリソースがあります。ウェブサイトとブログのニーズにWordPressを信頼する数百万のユーザーに参加しましょう。
+
+            ## トラブルシューティング
+
+            問題が発生した場合は、問題を報告するために [https://github.com/lcandy2/zeabur-wordpress-redis](https://github.com/lcandy2/zeabur-wordpress-redis) を参照してください。
+    zh-CN:
+        description: 一个集成了Redis缓存的高性能内容管理系统（CMS），可以让您托管和构建具有更好性能的可扩展网站。
+        readme: |
+            # 欢迎使用集成Redis的WordPress
+
+            WordPress 是一个开源的内容管理系统（CMS），可以让您从零开始创建一个网站或博客，或改进现有的网站。这个模板集成了Redis缓存，与标准WordPress相比，提供了显著提升的性能和可扩展性。
+
+            ## Redis带来的性能提升
+            
+            Redis集成提供：
+            - 通过高效的缓存加快页面加载速度
+            - 降低数据库负载
+            - 更好地处理高流量
+            - 提升整体网站性能
+            
+            ## 重要：启用Redis缓存
+
+            在完成WordPress安装后，要启用Redis缓存请：
+            1. 进入WordPress管理后台
+            2. 转到"插件"页面
+            3. 找到并启用"Redis Object Cache"插件
+            4. 转到 设置 > Redis 验证连接状态
+            
+            ## 主要特点
+
+            - **用户友好**：WordPress 是为非技术用户设计的，使任何人都可以轻松发布内容。
+            - **可定制**：有成千上万的主题和插件，您可以根据需要和风格定制您的网站。
+            - **SEO 友好**：WordPress 开箱即用地对搜索引擎进行了优化。
+            - **响应式设计**：无论是计算机、平板电脑还是智能手机，您的 WordPress 网站都将看起来很棒。
+
+            无论您是博主、小企业主还是网站开发者，WordPress 都有工具和资源帮助您创建一个专业的在线形象。加入数百万信任 WordPress 来满足他们网站和博客需求的用户行列吧。
+
+            ## 故障排除
+
+            如果遇到任何问题，请参考 [https://github.com/lcandy2/zeabur-wordpress-redis](https://github.com/lcandy2/zeabur-wordpress-redis) 报告问题。
+    zh-TW:
+        description: 一個集成了Redis緩存的高性能內容管理系統（CMS），可以讓您托管和構建具有更好性能的可擴展網站。
+        readme: |
+            # 歡迎使用集成Redis的WordPress
+
+            WordPress 是一個開源的內容管理系統（CMS），可以讓您從零開始創建一個網站或博客，或改進現有的網站。這個模板集成了Redis緩存，與標準WordPress相比，提供了顯著提升的性能和可擴展性。
+
+            ## Redis帶來的性能提升
+            
+            Redis集成提供：
+            - 通過高效的緩存加快頁面加載速度
+            - 降低數據庫負載
+            - 更好地處理高流量
+            - 提升整體網站性能
+            
+            ## 重要：啟用Redis快取
+
+            在完成WordPress安裝後，要啟用Redis快取請：
+            1. 進入WordPress管理後台
+            2. 轉到"外掛"頁面
+            3. 找到並啟用"Redis Object Cache"外掛
+            4. 轉到 設定 > Redis 驗證連接狀態
+            
+            ## 主要特點
+
+            - **用戶友好**：WordPress 是為非技術用戶設計的，使任何人都可以輕鬆發布內容。
+            - **可定制**：有成千上萬的主題和插件，您可以根據需要和風格定制您的網站。
+            - **SEO 友好**：WordPress 開箱即用地對搜索引擎進行了優化。
+            - **響應式設計**：無論是計算機、平板電腦還是智能手機，您的 WordPress 網站都將看起來很棒。
+
+            無論您是博主、小企業主還是網站開發者，WordPress 都有工具和資源幫助您創建一個專業的在線形象。加入數百萬信任 WordPress 來滿足他們網站和博客需求的用戶行列吧。
+
+            ## 故障排除
+
+            如果遇到任何問題，請參考 [https://github.com/lcandy2/zeabur-wordpress-redis](https://github.com/lcandy2/zeabur-wordpress-redis) 報告問題。
